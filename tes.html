@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Magic AI - V9.9</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Core -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            background-color: #ffffff;
+        }
+        .group:hover .group-hover\:rotate-12 { transform: rotate(12deg); }
+        .group:hover .group-hover\:scale-105 { transform: scale(1.05); }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .custom-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const lucideName = name === 'Image' ? 'image' : name.toLowerCase();
+            return <i data-lucide={lucideName} className={className} style={{ display: 'inline-flex', width: size, height: size }}></i>;
+        };
+
+        // --- KONFIGURASI API ---
+        const apiKey = "AIzaSyBmipegbkCs1uZW2taRf6WF4NxS8B1STL8"; 
+        const NANO_BANANA = "gemini-2.5-flash-image-preview";
+        const GEMINI_TEXT = "gemini-2.5-flash-preview-09-2025";
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [emailInput, setEmailInput] = useState("");
+            const [activeTab, setActiveTab] = useState("home");
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [processStatus, setProcessStatus] = useState("");
+            const [selectedImage, setSelectedImage] = useState(null);
+            const [generatedResults, setGeneratedResults] = useState([]); 
+            const [error, setError] = useState(null);
+            const [copiedIndex, setCopiedIndex] = useState(null);
+            
+            const [extraInstructions, setExtraInstructions] = useState("");
+            const [quantity, setQuantity] = useState(5);
+            const [ratio, setRatio] = useState("9:16");
+            const [lighting, setLighting] = useState("Ultra-Bright 4K");
+            const [mood, setMood] = useState("Luxury & Sharp");
+            const [includeDoodles, setIncludeDoodles] = useState(true);
+
+            const allowedEmails = ["ratmi.ardian@gmail.com", "pembeli@magic.com", "admin@magic.com"];
+
+            const bgVariations = [
+                "Ultra-modern professional minimalist studio, crystal sharp focus, high-end 4K texture",
+                "Luxury polished white marble background, bright natural morning sunlight, elite product photography",
+                "High-end minimalist aesthetic interior, warm vibrant lighting, professional commercial setup",
+                "Upscale product showcase, elegant premium prop styling, HDR vivid clarity",
+                "Clean high-fashion studio, high-key bright lighting, ultra-sharp detail"
+            ];
+
+            const motionStyles = [
+                "Slow cinematic dolly-zoom towards the product center",
+                "Smooth orbital rotation providing a 360-degree premium feel",
+                "Horizontal sliding pan with shifting focus on product textures",
+                "Elegant vertical tilt-up from base to top",
+                "Dynamic pulsing macro zoom with shimmering light effects"
+            ];
+
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [activeTab, isProcessing, generatedResults, user]);
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (allowedEmails.includes(emailInput.toLowerCase())) {
+                    setUser({ email: emailInput, role: 'member' });
+                    setActiveTab("home");
+                    setError(null);
+                } else {
+                    setError("Email tidak terdaftar atau belum aktif.");
+                }
+            };
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setSelectedImage(reader.result);
+                        setGeneratedResults([]);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const cleanJson = (text) => {
+                try {
+                    const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        const parsed = JSON.parse(jsonMatch[0]);
+                        return JSON.stringify(parsed, null, 2);
+                    }
+                    return text;
+                } catch (e) { return text; }
+            };
+
+            const generateAI = async (type) => {
+                if (!selectedImage) { setError("Unggah gambar dulu!"); return; }
+                if (!apiKey) { setError("PENTING: Masukkan API Key Google AI Studio Anda di dalam kode (baris 45)."); return; }
+
+                setIsProcessing(true);
+                setError(null);
+                setGeneratedResults([]);
+                setProcessStatus("Menghubungi AI Google...");
+
+                try {
+                    const base64Data = selectedImage.split(",")[1];
+                    
+                    // Identifikasi Produk
+                    const analyzeResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TEXT}:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: "Identify this product for sales context. Return 1-2 words only." }, { inlineData: { mimeType: "image/png", data: base64Data } }] }]
+                        })
+                    });
+                    
+                    const analyzeData = await analyzeResponse.json();
+                    if (analyzeData.error) throw new Error(`Google API Error: ${analyzeData.error.message}`);
+                    
+                    const productLabel = analyzeData.candidates?.[0]?.content?.parts?.[0]?.text || "Product";
+
+                    const finalResults = [];
+                    const targetCount = Math.min(quantity, 5);
+
+                    for (let i = 0; i < targetCount; i++) {
+                        setProcessStatus(`Merender variasi ${i + 1} dari ${targetCount}...`);
+                        
+                        const currentBG = bgVariations[i % bgVariations.length];
+                        const currentMotion = motionStyles[i % motionStyles.length];
+                        
+                        const povDirective = type === 'pov' 
+                            ? `MANDATORY: YOU MUST SHOW A REALISTIC CLEAN HUMAN HAND FIRMLY HOLDING THIS ${productLabel} AS THE MAIN FOCUS. First-person view photoshoot.`
+                            : `PROFESSIONAL PHOTOSHOOT OF THIS ${productLabel} IN A HIGH-END STUDIO.`;
+
+                        const finalPrompt = `STRICT MANDATE: KEEP PRODUCT 100% IDENTICAL. 4K SHARP VIVID CLEAR TONES.
+                        ${povDirective} RATIO: ${ratio}. BG: ${currentBG}.
+                        DOODLE: ${includeDoodles ? 'Add white aesthetic hand-drawn doodle art, labels, and stars.' : 'Clean style.'}
+                        OUTPUT FORMAT: YOUR RESPONSE MUST BE ONLY A VALID JSON BLOCK.
+                        JSON DATA: { 
+                            "aspect_ratio": "${ratio}", 
+                            "camera_motion": "${currentMotion}", 
+                            "video_prompt": "Cinematic 4K ${currentMotion} animation of this ${productLabel}, ratio ${ratio}, high-end commercial quality." 
+                        }
+                        USER_EXTRA: ${extraInstructions}`;
+
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${NANO_BANANA}:generateContent?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: finalPrompt }, { inlineData: { mimeType: "image/png", data: base64Data } }] }],
+                                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.error) throw new Error(`Render Error: ${data.error.message}`);
+
+                        const base64Out = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                        const textOut = data.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
+
+                        if (base64Out) {
+                            finalResults.push({
+                                url: `data:image/png;base64,${base64Out}`,
+                                jsonPrompt: cleanJson(textOut || '{"status": "json_failed"}')
+                            });
+                            setGeneratedResults([...finalResults]);
+                        }
+                        
+                        // Jeda singkat antar request
+                        await new Promise(res => setTimeout(res, 1000));
+                    }
+
+                    if (finalResults.length === 0) throw new Error("Tidak ada hasil yang diterima dari AI.");
+                    setActiveTab("result");
+
+                } catch (err) {
+                    setError(err.message || "Gagal memproses gambar. Coba lagi nanti.");
+                } finally {
+                    setIsProcessing(false);
+                    setProcessStatus("");
+                }
+            };
+
+            const copyToClipboard = (text, index) => {
+                const el = document.createElement('textarea');
+                el.value = text;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                setCopiedIndex(index);
+                setTimeout(() => setCopiedIndex(null), 2000);
+            };
+
+            if (!user) {
+                return (
+                    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                        <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-10 border border-white animate-in">
+                            <div className="text-center mb-8">
+                                <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl">
+                                    <Icon name="Zap" size={32} className="text-white" />
+                                </div>
+                                <h1 className="text-3xl font-black text-slate-900 tracking-tighter italic">Studio Magic AI</h1>
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-2">V9.9 • Final Production</p>
+                            </div>
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <input 
+                                    type="email" 
+                                    className="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm shadow-inner"
+                                    placeholder="Masukkan Email Lisensi..."
+                                    value={emailInput}
+                                    onChange={(e) => setEmailInput(e.target.value)}
+                                />
+                                {error && <p className="text-red-500 text-[10px] font-bold px-2 text-center">{error}</p>}
+                                <button className="w-full bg-indigo-600 py-5 rounded-2xl text-white font-black uppercase tracking-widest text-xs shadow-lg active:scale-95 transition-all">Masuk Studio</button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-white text-slate-900 flex flex-col font-sans selection:bg-indigo-50 pb-24 lg:pb-0">
+                    <div className="flex flex-col lg:flex-row min-h-screen overflow-hidden">
+                        {/* Sidebar Desktop */}
+                        <nav className="hidden lg:flex w-72 bg-slate-50 border-r border-slate-100 p-8 flex flex-col shadow-sm">
+                            <div className="flex items-center gap-3 mb-12">
+                                <div className="bg-indigo-600 p-2 rounded-lg shadow-lg">
+                                    <Icon name="Zap" size={20} className="text-white" />
+                                </div>
+                                <span className="font-black text-xl tracking-tighter uppercase text-slate-900 italic">Magic AI</span>
+                            </div>
+                            <div className="space-y-2 flex-1">
+                                <NavBtn active={activeTab === 'home'} icon="Home" label="Beranda" onClick={() => setActiveTab('home')} />
+                                <NavBtn active={activeTab === 'photoshoot'} icon="Camera" label="Photoshoot" onClick={() => { setActiveTab('photoshoot'); setGeneratedResults([]); }} />
+                                <NavBtn active={activeTab === 'pov'} icon="Hand" label="POV Tangan" onClick={() => { setActiveTab('pov'); setGeneratedResults([]); }} />
+                            </div>
+                            <button onClick={() => setUser(null)} className="flex items-center gap-4 p-4 text-slate-400 hover:text-red-500 font-black text-[10px] uppercase tracking-widest border-t pt-10 mt-10 transition-colors">
+                                <Icon name="LogOut" size={16} /><span>Logout Akun</span>
+                            </button>
+                        </nav>
+
+                        {/* Mobile Header */}
+                        <div className="lg:hidden flex items-center justify-between p-6 border-b border-slate-100 bg-white sticky top-0 z-50 shadow-sm">
+                            <div className="flex items-center gap-2">
+                                <Icon name="Zap" size={20} className="text-indigo-600" />
+                                <span className="font-black text-sm tracking-tighter uppercase">Magic Studio</span>
+                            </div>
+                            <button onClick={() => setUser(null)} className="text-slate-400">
+                                <Icon name="LogOut" size={18} />
+                            </button>
+                        </div>
+
+                        <main className="flex-1 p-6 lg:p-12 overflow-y-auto bg-white animate-in">
+                            <header className="mb-10">
+                                <h2 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter italic">
+                                    {activeTab === 'home' ? 'Selamat Datang' : activeTab === 'result' ? 'Galeri Kreasi 4K' : 'Studio Produksi'}
+                                </h2>
+                                <p className="text-slate-400 text-[10px] lg:text-xs font-bold uppercase tracking-widest mt-1 italic">{user.email}</p>
+                            </header>
+
+                            {activeTab === 'home' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10 max-w-4xl">
+                                    <FeatureCard icon="Camera" title="AI Photoshoot" desc="Ganti latar belakang produk mewah 4K otomatis & estetik." onClick={() => setActiveTab('photoshoot')} />
+                                    <FeatureCard icon="Hand" title="AI POV Tangan" desc="Produk 100% identik digenggam tangan manusia asli secara presisi." onClick={() => setActiveTab('pov')} />
+                                </div>
+                            )}
+
+                            {(activeTab === 'photoshoot' || activeTab === 'pov') && (
+                                <div className="grid grid-cols-1 xl:grid-cols-5 gap-8 lg:gap-12 animate-in slide-in-from-bottom-4 duration-500">
+                                    <div className="xl:col-span-3 space-y-6">
+                                        <div className="bg-slate-50 p-6 lg:p-10 rounded-[3rem] border border-slate-100 shadow-inner">
+                                            <div className="flex justify-between items-center mb-6 font-black text-[9px] lg:text-[10px] uppercase text-stone-400 tracking-widest italic">
+                                                <span>1. Input Gambar Produk</span>
+                                                {selectedImage && <button onClick={() => setSelectedImage(null)} className="text-red-500 hover:scale-110 transition-all"><Icon name="X" size={22}/></button>}
+                                            </div>
+                                            <label className="block w-full aspect-square md:aspect-video bg-white border-2 border-dashed border-slate-200 rounded-[2.5rem] overflow-hidden cursor-pointer hover:border-indigo-500 transition-all relative shadow-sm">
+                                                {selectedImage ? (
+                                                    <img src={selectedImage} alt="Input" className="w-full h-full object-contain p-6 sm:p-8" />
+                                                ) : (
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300">
+                                                        <div className="p-8 bg-slate-50 rounded-full mb-4 shadow-sm">
+                                                            <Icon name="Upload" size={42} />
+                                                        </div>
+                                                        <span className="font-bold text-[10px] uppercase tracking-[0.3em]">Ketuk Untuk Unggah</span>
+                                                    </div>
+                                                )}
+                                                <input type="file" className="hidden" onChange={handleImageUpload} accept="image/*" />
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div className="xl:col-span-2 space-y-6">
+                                        <div className="bg-white p-8 lg:p-10 rounded-[3rem] border border-slate-100 shadow-2xl space-y-8">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic flex items-center gap-1"><Icon name="Sun" size={12}/> Cahaya</label>
+                                                    <select value={lighting} onChange={(e) => setLighting(e.target.value)} className="w-full bg-slate-50 p-3 rounded-xl border border-slate-100 font-bold text-[11px] outline-none">
+                                                        <option>Ultra-Bright 4K</option>
+                                                        <option>Golden Hour</option>
+                                                        <option>Soft Daylit</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic flex items-center gap-1"><Icon name="Palette" size={12}/> Mood</label>
+                                                    <select value={mood} onChange={(e) => setMood(e.target.value)} className="w-full bg-slate-50 p-3 rounded-xl border border-slate-100 font-bold text-[11px] outline-none">
+                                                        <option>Luxury & Sharp</option>
+                                                        <option>Vivid Clear</option>
+                                                        <option>Modern High-Key</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic flex items-center gap-1"><Icon name="Type" size={12}/> Instruksi Khusus</label>
+                                                <textarea 
+                                                    className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs lg:text-sm outline-none focus:ring-2 focus:ring-indigo-100 min-h-[80px] shadow-inner"
+                                                    placeholder="Contoh: Tambah tulisan 'Limited Edition'..."
+                                                    value={extraInstructions}
+                                                    onChange={(e) => setExtraInstructions(e.target.value)}
+                                                />
+                                                <label className="flex items-center gap-3 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 border-dashed cursor-pointer">
+                                                    <input type="checkbox" checked={includeDoodles} onChange={(e) => setIncludeDoodles(e.target.checked)} className="w-5 h-5 accent-indigo-600" />
+                                                    <span className="text-[10px] font-black text-indigo-700 uppercase italic">Gunakan Doodle Pintar</span>
+                                                </label>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic font-bold">Variasi Hasil: {quantity}</label>
+                                                <input type="range" min="1" max="5" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value))} className="w-full accent-indigo-600 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer" />
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic font-bold">Pilih Rasio</label>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {['1:1', '3:4', '4:3', '9:16', '16:9'].map((r) => (
+                                                        <button key={r} onClick={() => setRatio(r)} className={`py-3 rounded-xl border text-[10px] font-black transition-all ${ratio === r ? "bg-indigo-600 text-white shadow-lg border-indigo-600" : "bg-slate-50 text-slate-400 border-slate-100"}`}>
+                                                            {r}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <button onClick={() => generateAI(activeTab)} disabled={isProcessing || !selectedImage} className="w-full bg-slate-900 text-white font-black py-6 rounded-3xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-4 group disabled:opacity-50">
+                                                {isProcessing ? <Icon name="Loader2" className="animate-spin" /> : <Icon name="Sparkles" className="group-hover:rotate-12 transition-transform" />}
+                                                <span className="text-xs uppercase tracking-widest">{isProcessing ? 'Memproses...' : 'Mulai Magic AI'}</span>
+                                            </button>
+                                            
+                                            {isProcessing && <p className="text-center text-[10px] text-indigo-600 font-bold uppercase animate-pulse">{processStatus}</p>}
+                                            {error && (
+                                                <div className="p-4 bg-red-50 rounded-2xl border border-red-100 flex items-start gap-3 text-red-600">
+                                                    <Icon name="AlertCircle" size={16} className="mt-0.5" />
+                                                    <p className="text-[10px] font-bold leading-relaxed">{error}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'result' && (
+                                <div className="space-y-12 animate-in duration-700 pb-20">
+                                    <h3 className="font-black text-2xl lg:text-3xl text-slate-900 tracking-tighter uppercase flex items-center gap-3 italic underline decoration-indigo-200 decoration-8 underline-offset-4 px-2">
+                                        <Icon name="Image" className="text-indigo-600"/> Koleksi Hasil Magic
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
+                                        {generatedResults.map((result, idx) => (
+                                            <div key={idx} className="bg-slate-50 rounded-[4rem] p-8 lg:p-10 border border-slate-100 flex flex-col shadow-inner animate-in">
+                                                <div className="aspect-square rounded-[2.5rem] overflow-hidden border-4 border-white shadow-xl bg-white relative group">
+                                                    <img src={result.url} alt={`Result ${idx}`} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-[1500ms]" />
+                                                    <div className="absolute top-6 left-6 bg-indigo-600/90 backdrop-blur-md px-4 py-2 rounded-full text-[10px] font-black text-white uppercase shadow-xl italic border border-white/20">
+                                                        V{idx + 1} • {ratio} SYNC
+                                                    </div>
+                                                </div>
+                                                <div className="mt-8 p-6 lg:p-8 bg-white rounded-[2.5rem] border border-indigo-50 shadow-xl flex flex-col gap-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <Icon name="Code" size={18} className="text-indigo-600" />
+                                                            <div>
+                                                                <span className="text-[10px] font-black text-slate-900 uppercase block leading-none">Video Motion JSON</span>
+                                                                <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-widest italic">Rasio {ratio}</span>
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => copyToClipboard(result.jsonPrompt, idx)}
+                                                            className={`p-3 rounded-xl transition-all flex items-center gap-2 font-bold text-[9px] uppercase shadow-sm ${copiedIndex === idx ? "bg-green-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-indigo-600 hover:text-white"}`}
+                                                        >
+                                                            {copiedIndex === idx ? <Icon name="Check" size={14} /> : <Icon name="Copy" size={14} />}
+                                                            {copiedIndex === idx ? "Copied!" : "Salin Prompt"}
+                                                        </button>
+                                                    </div>
+                                                    <div className="bg-slate-900 p-6 rounded-2xl overflow-x-auto shadow-inner custom-scroll">
+                                                        <pre className="text-[10px] lg:text-[11px] text-indigo-300 font-mono whitespace-pre-wrap">{result.jsonPrompt}</pre>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-6 flex justify-center">
+                                                    <a href={result.url} download={`magic-4k-${idx+1}.png`} className="bg-slate-900 hover:bg-black text-white px-10 py-4 rounded-full shadow-lg flex items-center gap-3 active:scale-95 transition-all text-[10px] font-black uppercase tracking-widest">
+                                                        <Icon name="Download" size={16} /> Simpan 4K Image
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-16 flex justify-center">
+                                        <button onClick={() => setActiveTab('home')} className="px-16 py-6 bg-indigo-600 text-white rounded-[2.5rem] font-black text-xs uppercase shadow-2xl active:scale-95 transition-all flex items-center gap-2">
+                                            <Icon name="Home" size={16} /> Beranda Dashboard
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </main>
+
+                        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around py-4 px-6 z-50 shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
+                            <NavBtnMobile active={activeTab === 'home'} icon="Home" label="Home" onClick={() => setActiveTab('home')} />
+                            <NavBtnMobile active={activeTab === 'photoshoot'} icon="Camera" label="Photo" onClick={() => { setActiveTab('photoshoot'); setGeneratedResults([]); }} />
+                            <NavBtnMobile active={activeTab === 'pov'} icon="Hand" label="POV" onClick={() => { setActiveTab('pov'); setGeneratedResults([]); }} />
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const NavBtn = ({ active, icon, label, onClick }) => (
+            <button onClick={onClick} className={`w-full flex items-center gap-5 px-8 py-5 rounded-3xl font-black transition-all ${active ? "bg-white text-indigo-600 shadow-xl border border-indigo-50 scale-[1.02]" : "text-slate-400 hover:text-slate-900"}`}>
+                <Icon name={icon} size={20} className={active ? "text-indigo-600" : ""} />
+                <span className="text-xs uppercase tracking-tight">{label}</span>
+                {active && <Icon name="ArrowRight" size={14} className="ml-auto opacity-30" />}
+            </button>
+        );
+
+        const NavBtnMobile = ({ active, icon, label, onClick }) => (
+            <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all ${active ? "text-indigo-600 scale-110" : "text-slate-300"}`}>
+                <Icon name={icon} size={22} />
+                <span className="text-[9px] font-black uppercase tracking-tight">{label}</span>
+            </button>
+        );
+
+        const FeatureCard = ({ icon, title, desc, onClick }) => (
+            <div onClick={onClick} className="bg-white p-8 sm:p-10 rounded-[4rem] border border-slate-100 hover:border-indigo-200 hover:shadow-[0_40px_60px_-12px_rgba(79,70,229,0.1)] transition-all cursor-pointer group relative overflow-hidden animate-in">
+                <div className="w-16 h-16 bg-slate-50 rounded-[1.5rem] flex items-center justify-center mb-8 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">
+                    <Icon name={icon} size={30} />
+                </div>
+                <h3 className="font-black text-slate-900 text-2xl mb-4 tracking-tighter italic">{title}</h3>
+                <p className="text-[13px] text-slate-400 leading-relaxed font-bold mb-8 italic opacity-80">{desc}</p>
+                <div className="flex items-center text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] group-hover:gap-4 transition-all">
+                    Gunakan Modul <Icon name="ArrowRight" size={16} className="ml-1" />
+                </div>
+            </div>
+        );
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
