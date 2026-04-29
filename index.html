@@ -43,10 +43,10 @@
             return <i data-lucide={lucideName} className={className} style={{ display: 'inline-flex', width: size, height: size }}></i>;
         };
 
-        // --- KONFIGURASI API ---
-        const apiKey = "AIzaSyBmipegbkCs1uZW2taRf6WF4NxS8B1STL8"; 
-        const NANO_BANANA = "gemini-1.5-flash-image-preview";
-        const GEMINI_TEXT = "gemini-1.5-flash-preview-09-2025";
+      // --- KONFIGURASI API ---
+            const apiKey = "AIzaSyBmipegbkCs1uZW2taRf6WF4NxS8B1STL8"; 
+            const NANO_BANANA = "gemini-1.5-flash"; // Versi stabil yang mendukung gambar
+            const GEMINI_TEXT = "gemini-1.5-flash";
 
         const App = () => {
             const [user, setUser] = useState(null);
