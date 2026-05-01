@@ -1,0 +1,174 @@
+import streamlit as st
+import google.generativeai as genai
+import PIL.Image
+import json
+import time
+
+# --- KONFIGURASI API ---
+# Pastikan Anda menyimpan API Key di Secrets GitHub atau Streamlit Cloud
+# Untuk lokal, Anda bisa mengisinya langsung atau lewat environment variable
+api_key = "" # Biarkan kosong jika ingin diinput via UI
+
+def call_gemini_api(model, contents, system_prompt):
+    """Fungsi untuk memanggil Gemini API dengan Exponential Backoff"""
+    retries = 5
+    for i in range(retries):
+        try:
+            response = model.generate_content(
+                contents,
+                generation_config={
+                    "response_mime_type": "application/json",
+                }
+            )
+            return response.text
+        except Exception as e:
+            if i == retries - 1:
+                st.error(f"Gagal memanggil API setelah {retries} percobaan: {str(e)}")
+                return None
+            wait_time = (2 ** i)
+            time.sleep(wait_time)
+    return None
+
+# --- UI SETUP ---
+st.set_page_config(page_title="PromptMaster AI", layout="wide", page_icon="🪄")
+
+# Custom CSS untuk tampilan lebih modern
+st.markdown("""
+    <style>
+    .main { background-color: #f8f9fa; }
+    .stButton>button { width: 100%; border-radius: 8px; height: 3em; background-color: #00bcd4; color: white; border: none; }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { background-color: #f1f3f4; border-radius: 5px 5px 0 0; padding: 10px 20px; }
+    .stTabs [aria-selected="true"] { background-color: #00bcd4 !important; color: white !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("🪄 PromptMaster AI Builder")
+st.caption("Generate Prompt JSON Akurat untuk Grok, Flux, dan Veo3 menggunakan Google Gemini AI.")
+
+# Input API Key di Sidebar jika belum diset di kode
+if not api_key:
+    user_api_key = st.sidebar.text_input("Masukkan Google AI API Key:", type="password")
+    if user_api_key:
+        genai.configure(api_key=user_api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
+    else:
+        st.warning("Silakan masukkan API Key di sidebar untuk memulai.")
+        st.stop()
+else:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
+
+# --- MENU UTAMA (TABS) ---
+tab_photoshoot, tab_pov, tab_gabung, tab_video = st.tabs([
+    "📸 Photoshoot Produk", 
+    "🖐️ POV Tangan", 
+    "🖼️ Gabungkan Gambar", 
+    "🎬 Video Motion"
+])
+
+# --- GLOBAL SETTINGS ---
+st.sidebar.divider()
+st.sidebar.subheader("Opsi Tambahan")
+enhance_mode = st.sidebar.checkbox("Perjelas Hasil (High Detail/Macro Mode)", value=True)
+target_engine = st.sidebar.selectbox("Target AI Engine:", ["Flux.1", "Grok-2", "Veo3 (Video)", "Stable Diffusion XL"])
+num_variations = st.sidebar.slider("Jumlah Variasi:", 1, 10, 4)
+
+# --- LOGIK PEMBUATAN PROMPT ---
+def generate_prompt_logic(mode, data, images=[]):
+    system_instruction = f"""
+    Anda adalah seorang Expert Prompt Engineer untuk AI Gambar (Flux, Grok, Veo3).
+    Tugas Anda adalah menganalisis gambar dan input pengguna, lalu menghasilkan sebuah Prompt dalam format JSON yang sangat detail.
+    Format JSON harus mencakup: subject, lighting, environment, camera_settings, style, dan technical_parameters.
+    Gunakan Bahasa Inggris teknis yang kaya untuk isi promptnya.
+    Target Engine: {target_engine}.
+    Mode: {mode}.
+    Enhance Mode: {'Aktif (Tambahkan detail mikroskopis, tekstur 8k, dan kejernihan tinggi)' if enhance_mode else 'Standar'}.
+    """
+    
+    prompt_request = f"Buatkan prompt JSON berdasarkan data berikut: {json.dumps(data)}"
+    
+    contents = [prompt_request]
+    for img in images:
+        if img is not None:
+            image_data = PIL.Image.open(img)
+            contents.append(image_data)
+            
+    with st.spinner("AI sedang merangkai prompt JSON..."):
+        result = call_gemini_api(model, contents, system_instruction)
+        return result
+
+# --- 1. TAB: PHOTOSHOOT PRODUK ---
+with tab_photoshoot:
+    st.subheader("1. Photoshoot Produk")
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        uploaded_prod = st.file_uploader("Unggah Foto Produk", type=["jpg", "png", "webp"], key="ps_upload")
+    with col2:
+        ps_light = st.radio("Pencahayaan", ["Light", "Dark"], horizontal=True)
+        ps_vibe = st.radio("Suasana", ["Clean", "Crowd"], horizontal=True)
+        ps_ratio = st.selectbox("Rasio", ["1:1", "16:9", "9:16"], key="ps_ratio")
+        ps_logo = st.file_uploader("Tambah Logo (Opsional)", type=["png"], key="ps_logo")
+
+    if st.button("Buat Prompt Photoshoot"):
+        if uploaded_prod:
+            data = {"mode": "Photoshoot", "lighting": ps_light, "vibe": ps_vibe, "ratio": ps_ratio, "variations": num_variations}
+            res = generate_prompt_logic("Photoshoot", data, [uploaded_prod])
+            if res:
+                st.subheader("Hasil Prompt JSON:")
+                st.code(res, language="json")
+        else:
+            st.error("Mohon unggah foto produk terlebih dahulu.")
+
+# --- 2. TAB: POV TANGAN ---
+with tab_pov:
+    st.subheader("2. POV Tangan")
+    uploaded_pov = st.file_uploader("Unggah Foto Produk", type=["jpg", "png", "webp"], key="pov_upload")
+    pov_desc = st.text_area("Deskripsi Produk / Interaksi (Biarkan kosong untuk 'Buat Otomatis')", placeholder="Contoh: Tangan sedang menekan pump botol serum...")
+    
+    if st.button("Generate Prompt POV"):
+        if uploaded_pov:
+            data = {"mode": "POV Tangan", "user_desc": pov_desc or "Auto-detect interaction", "variations": num_variations}
+            res = generate_prompt_logic("POV Tangan", data, [uploaded_pov])
+            if res:
+                st.subheader("Hasil Prompt JSON:")
+                st.code(res, language="json")
+        else:
+            st.error("Mohon unggah foto produk.")
+
+# --- 3. TAB: GABUNGKAN GAMBAR ---
+with tab_gabung:
+    st.subheader("3. Gabungkan Gambar (Min 2, Max 5)")
+    uploaded_files = st.file_uploader("Unggah Gambar", type=["jpg", "png", "webp"], accept_multiple_files=True)
+    gabung_instr = st.text_area("Instruksi Khusus", placeholder="Contoh: Gabungkan suasana pantai dari gambar 1 dengan produk di gambar 2...")
+    gabung_ratio = st.selectbox("Rasio", ["1:1", "16:9", "9:16"], key="gb_ratio")
+
+    if st.button("Buat Prompt Gabungan"):
+        if len(uploaded_files) >= 2:
+            data = {"mode": "Merge Images", "instruction": gabung_instr, "ratio": gabung_ratio, "variations": num_variations}
+            res = generate_prompt_logic("Merge Images", data, uploaded_files)
+            if res:
+                st.subheader("Hasil Prompt JSON:")
+                st.code(res, language="json")
+        else:
+            st.warning("Unggah minimal 2 gambar.")
+
+# --- 4. TAB: VIDEO MOTION ---
+with tab_video:
+    st.subheader("4. Video Motion (Veo3 Optimized)")
+    uploaded_vid_img = st.file_uploader("Unggah Gambar Referensi", type=["jpg", "png", "webp"], key="vid_upload")
+    motion_type = st.selectbox("Jenis Gerakan", ["Slow Cinematic Pan", "Dynamic Zoom In", "360 Rotation", "Object Floating", "Atmospheric Smoke Motion"])
+    motion_speed = st.slider("Kecepatan Gerakan", 1, 10, 5)
+
+    if st.button("Buat Prompt Video Motion"):
+        if uploaded_vid_img:
+            data = {"mode": "Video Motion", "motion_type": motion_type, "speed": motion_speed, "target": "Veo3"}
+            res = generate_prompt_logic("Video Motion", data, [uploaded_vid_img])
+            if res:
+                st.subheader("Hasil Prompt JSON Video:")
+                st.code(res, language="json")
+        else:
+            st.error("Mohon unggah gambar referensi.")
+
+st.divider()
+st.info("Salin hasil JSON di atas ke platform AI favorit Anda (Grok, Flux, atau Veo3).")
