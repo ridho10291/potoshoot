@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<!--
+__        __ _   _      _  _____      _      ____  _____   __   __ ___   _   _ 
+\ \      / /| | | |    / \|_   _|    / \    |  _ \| ____|  \ \ / // _ \ | | | |
+ \ \ /\ / / | |_| |   / _ \ | |     / _ \   | |_) |  _|     \ V /| | | || | | |
+  \ V  V /  |  _  |  / ___ \| |    / ___ \  |  _ <| |___     | | | |_| || |_| |
+   \_/\_/   |_| |_| /_/   \_\_|   /_/   \_\ |_| \_\_____|    |_|  \___/  \___/ 
+
+ ____    ___  ___  _   _   ____     ____  ____    ___   ___  
+|  _ \  / _ \|_ _|| \ | | / ___|   | __ )|  _ \  / _ \ |__ \ 
+| | | || | | || | |  \| || |  _    |  _ \| |_) || | | |  / / 
+| |_| || |_| || | | |\  || |_| |   | |_) |  _ < | |_| | |_|  
+|____/  \___/|___||_| \_| \____|   |____/|_| \_\ \___/  (_)  
+-->
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POV Tangan | AI Visual Studio</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="auth.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>AI Visual Studio</span>
+                </div>
+            </div>
+            
+            <ul class="nav-links">
+                <a href="dashboard-ai.html" class="nav-link-item"><li class="nav-item">
+                    <i class="fa-solid fa-camera-retro"></i>
+                    <span>Photoshoot Produk</span>
+                </li></a>
+                <a href="pov-tangan.html" class="nav-link-item"><li class="nav-item active">
+                    <i class="fa-solid fa-hand-holding"></i>
+                    <span>POV Tangan</span>
+                </li></a>
+                <a href="gabungkan-gambar.html" class="nav-link-item"><li class="nav-item">
+                    <i class="fa-solid fa-object-group"></i>
+                    <span>Gabungkan Gambar</span>
+                </li></a>
+                <a href="admin.html" class="nav-link-item"><li class="nav-item">
+                    <i class="fa-solid fa-screwdriver-wrench"></i>
+                    <span>Dev Admin</span>
+                </li></a>
+            </ul>
+
+            <div class="user-profile mt-auto">
+                <img src="https://ui-avatars.com/api/?name=User&background=6b21a8&color=fff" alt="User Avatar">
+                <div class="user-info">
+                    <h4 id="logged-user-email">User</h4>
+                    <button class="btn-text" onclick="handleLogout()" style="margin-top:5px; font-size:0.75rem; color:#ef4444;"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <h1>POV Tangan</h1>
+                <p>Hasilkan foto realistis sudut pandang orang pertama yang sedang memegang produk.</p>
+            </header>
+
+            <div class="content-wrapper">
+                <section id="pov" class="tab-content active" style="display:block;">
+                    <div class="grid-layout">
+                        <!-- Left Column: Inputs -->
+                        <div class="control-panel">
+                            <div class="form-group">
+                                <label>Unggah Foto Produk</label>
+                                <div class="upload-zone" id="upload-pov">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    <p>Tarik & Lepas foto di sini atau <span>Klik untuk mencari</span></p>
+                                    <input type="file" hidden accept="image/*">
+                                </div>
+                                <div class="preview-area" id="preview-pov"></div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="label-with-action">
+                                    <label>Deskripsi Produk / Instruksi</label>
+                                    <button class="btn-text btn-auto"><i class="fa-solid fa-wand-magic"></i> Buat Otomatis</button>
+                                </div>
+                                <textarea placeholder="Deskripsikan bagaimana tangan berinteraksi dengan produk..."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Jenis/Nama Objek Utama (Opsional)</label>
+                                <input type="text" id="object-name-pov" class="admin-input" placeholder="Contoh: Celana Jeans, Sepatu Kets, dll." style="width: 100%;">
+                            </div>
+
+                            <div class="form-group flex-row">
+                                <label class="switch-label">
+                                    <span>Hapus Teks pada Gambar</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="remove-text-pov">
+                                        <span class="slider round"></span>
+                                    </label>
+                                </label>
+                            </div>
+
+                            <div class="form-group flex-row" style="margin-bottom: 1rem;">
+                                <label class="switch-label">
+                                    <span>Penjelasan Prompt Detail</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="detail-toggle-pov" checked>
+                                        <span class="slider round"></span>
+                                    </label>
+                                </label>
+                            </div>
+
+                            <button class="btn-primary" onclick="generateAction('pov')">
+                                <i class="fa-solid fa-bolt"></i> Generate Prompt (JSON)
+                            </button>
+                        </div>
+
+                        <!-- Right Column: Results -->
+                        <div class="result-panel">
+                            <div class="result-placeholder">
+                                <div class="spinner hidden"></div>
+                                <i class="fa-regular fa-image"></i>
+                                <p>Hasil POV realistis akan muncul di sini</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div id="toast" class="toast hidden">
+        <i class="fa-solid fa-check-circle"></i>
+        <span id="toast-message">Tindakan berhasil!</span>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
